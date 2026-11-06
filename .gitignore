@@ -1,0 +1,14 @@
+# Entorno virtual de Python
+.venv/
+
+# Archivos generados por Python
+__pycache__/
+*.py[cod]
+
+# Configuración local y secretos
+.env
+
+# Resultados temporales de pruebas
+.pytest_cache/
+.coverage
+htmlcov/
