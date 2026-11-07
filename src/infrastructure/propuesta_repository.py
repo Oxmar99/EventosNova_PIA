@@ -86,3 +86,71 @@ class SqlAlchemyRepositorioDePropuestas:
             raise LookupError("La propuesta no existe.")
 
         fila.estado = propuesta.estado.value
+
+    def guardar_versiones(self, propuesta: Propuesta) -> None:
+        fila = self.session.get(PropuestaRow, propuesta.id)
+
+        if fila is None:
+            raise LookupError("La propuesta no existe.")
+
+        existentes = {
+            version.numero: version
+            for version in fila.versiones
+        }
+
+        numeros_actuales = {
+            version.numero for version in propuesta.versiones
+        }
+
+        if not set(existentes).issubset(numeros_actuales):
+            raise ValueError("No se permite eliminar versiones.")
+
+        for version in propuesta.versiones:
+            anterior = existentes.get(version.numero)
+
+            if anterior is not None:
+                contenido_guardado = [
+                    (
+                        linea.recurso_id,
+                        linea.descripcion,
+                        linea.precio_centavos,
+                        linea.cantidad,
+                    )
+                    for linea in anterior.lineas
+                ]
+
+                contenido_actual = [
+                    (
+                        linea.recurso_id,
+                        linea.descripcion,
+                        int(linea.precio_unitario.monto * 100),
+                        linea.cantidad,
+                    )
+                    for linea in version.lineas
+                ]
+
+                if contenido_guardado != contenido_actual:
+                    raise ValueError(
+                        "Las versiones existentes son inmutables."
+                    )
+                continue
+
+            nueva = VersionRow(numero=version.numero)
+
+            for posicion, linea in enumerate(version.lineas):
+                nueva.lineas.append(
+                    LineaRow(
+                        posicion=posicion,
+                        recurso_id=linea.recurso_id,
+                        descripcion=linea.descripcion,
+                        precio_centavos=int(
+                            linea.precio_unitario.monto * 100
+                        ),
+                        cantidad=linea.cantidad,
+                    )
+                )
+
+            fila.versiones.append(nueva)
+            existentes[version.numero] = nueva
+
+        fila.estado = propuesta.estado.value

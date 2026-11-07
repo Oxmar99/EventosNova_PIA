@@ -29,6 +29,16 @@ from src.infrastructure.propuesta_repository import (
 )
 from src.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
+from src.infrastructure.evento_models import EventoRow, PagoRow
+
+from src.api.evento_routes import router as eventos_router
+from src.application.evento_service import EventoNoEncontrado
+
+from src.api.proveedor_routes import router as proveedores_router
+
+from src.api.cambio_routes import router as cambios_router
+from src.application.cambio_service import CambioNoEncontrado
+from sqlalchemy.orm.exc import StaleDataError
 
 @asynccontextmanager
 async def lifespan(app):
@@ -176,3 +186,38 @@ def aceptar_propuesta(
     servicio: PropuestaService = Depends(obtener_servicio),
 ):
     return convertir_salida(servicio.aceptar(propuesta_id))
+
+@app.exception_handler(EventoNoEncontrado)
+async def evento_no_encontrado(request, error):
+    return JSONResponse(
+        status_code=404,
+        content={"detail": str(error)},
+    )
+
+
+app.include_router(eventos_router)
+
+app.include_router(proveedores_router)
+
+@app.exception_handler(CambioNoEncontrado)
+async def cambio_no_encontrado(request, error):
+    return JSONResponse(
+        status_code=404,
+        content={"detail": str(error)},
+    )
+
+
+@app.exception_handler(StaleDataError)
+async def conflicto_de_actualizacion(request, error):
+    return JSONResponse(
+        status_code=409,
+        content={
+            "detail": (
+                "Otro proceso modificó los datos. "
+                "Consulta su estado actual antes de reintentar."
+            )
+        },
+    )
+
+
+app.include_router(cambios_router)

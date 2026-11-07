@@ -147,3 +147,24 @@ class Propuesta:
                 version=self.version_vigente.numero,
             )
         )
+
+    def validar_nueva_version(self, anterior, nueva):
+        if self._estado != EstadoPropuesta.ACEPTADA:
+            raise TransicionInvalida(
+                "La propuesta debe estar aceptada para aplicar el cambio."
+            )
+
+        if self.version_vigente != anterior:
+            raise TransicionInvalida(
+                "La propuesta cambió desde que se solicitó la modificación."
+            )
+
+        if nueva.numero != anterior.numero + 1:
+            raise PropuestaInvalida(
+                "La nueva versión debe continuar la numeración."
+            )
+
+    def incorporar_version(self, anterior, nueva):
+        self.validar_nueva_version(anterior, nueva)
+        self._versiones.append(nueva)
+        self._registrar_evento("NuevaVersionDePropuestaGenerada")
