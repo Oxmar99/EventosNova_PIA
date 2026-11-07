@@ -34,7 +34,6 @@ class CambioService:
         evento_id,
         propuesta_id,
         nuevas_lineas,
-        fecha_evento,
         solicitante,
         motivo,
     ):
@@ -49,6 +48,14 @@ class CambioService:
                 evento_id,
                 propuesta_id,
             )
+
+            fechas = self.crear_fechas(uow.session)
+            fecha_evento = fechas.obtener(evento_id)
+
+            if fecha_evento is None:
+                raise CambioInvalido(
+                    "Registra la fecha del evento antes de solicitar cambios."
+                )
 
             cambio = SolicitudDeCambio(
                 propuesta=propuesta,
@@ -148,3 +155,19 @@ class CambioService:
         AplicadorDeCambios().aplicar(cambio, evento, propuesta)
         propuestas.guardar_versiones(propuesta)
         eventos.guardar(evento)
+
+    def __init__(
+        self,
+        crear_uow,
+        crear_eventos,
+        crear_propuestas,
+        crear_cambios,
+        fecha_actual,
+        crear_fechas,
+    ):
+        self.crear_uow = crear_uow
+        self.crear_eventos = crear_eventos
+        self.crear_propuestas = crear_propuestas
+        self.crear_cambios = crear_cambios
+        self.fecha_actual = fecha_actual
+        self.crear_fechas = crear_fechas

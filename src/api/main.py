@@ -40,6 +40,8 @@ from src.api.cambio_routes import router as cambios_router
 from src.application.cambio_service import CambioNoEncontrado
 from sqlalchemy.orm.exc import StaleDataError
 
+from src.api.fecha_evento_routes import router as fechas_router
+
 @asynccontextmanager
 async def lifespan(app):
     motor = crear_motor()
@@ -221,3 +223,5 @@ async def conflicto_de_actualizacion(request, error):
 
 
 app.include_router(cambios_router)
+
+app.include_router(fechas_router)

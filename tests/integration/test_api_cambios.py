@@ -12,7 +12,11 @@ CABECERAS = {"X-Admin-Key": "clave-ficticia-cambios"}
 
 
 @pytest.fixture
-def escenario(tmp_path, monkeypatch):
+def fecha_evento():
+    return HOY + timedelta(days=14)
+
+@pytest.fixture
+def escenario(tmp_path, monkeypatch,fecha_evento):
     archivo = (tmp_path / "api_cambios.db").as_posix()
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{archivo}")
     monkeypatch.setenv("ADMIN_API_KEY", CABECERAS["X-Admin-Key"])
@@ -65,16 +69,22 @@ def escenario(tmp_path, monkeypatch):
         )
         assert respuesta.status_code == 200, respuesta.text
 
+        respuesta = cliente.put(
+            "/eventos/EVE-O001/fecha",
+            json={"fecha": fecha_evento.isoformat()},
+            headers=CABECERAS,
+        )
+        assert respuesta.status_code == 200, respuesta.text
+
         yield cliente, propuesta_id
 
 
-def solicitar(cliente, propuesta_id, dias=14, precio="1200"):
+def solicitar(cliente, propuesta_id, precio="1200"):
     return cliente.post(
         "/cambios",
         json={
             "evento_id": "EVE-O001",
             "propuesta_id": propuesta_id,
-            "fecha_evento": (HOY + timedelta(days=dias)).isoformat(),
             "motivo": "Ampliación de servicios",
             "nuevas_lineas": [{
                 "recurso_id": "EVE-P001",
@@ -96,11 +106,17 @@ def consultar_evento(cliente):
     return respuesta.json()
 
 
-@pytest.mark.parametrize("dias", [15, 16])
-def test_cambio_a_tiempo_se_aplica_sin_cargo(escenario, dias):
+@pytest.mark.parametrize(
+    "fecha_evento",
+    [
+        HOY + timedelta(days=15),
+        HOY + timedelta(days=16),
+    ],
+)
+def test_cambio_a_tiempo_se_aplica_sin_cargo(escenario, fecha_evento):
     cliente, propuesta_id = escenario
 
-    respuesta = solicitar(cliente, propuesta_id, dias=dias)
+    respuesta = solicitar(cliente, propuesta_id)
 
     assert respuesta.status_code == 201, respuesta.text
     cambio = respuesta.json()
@@ -244,3 +260,46 @@ def test_cambio_inexistente_devuelve_404(escenario):
     )
 
     assert respuesta.status_code == 404
+
+def test_no_permite_cambiar_fecha_registrada(escenario):
+    cliente, _ = escenario
+
+    respuesta = cliente.put(
+        "/eventos/EVE-O001/fecha",
+        json={"fecha": (HOY + timedelta(days=30)).isoformat()},
+        headers=CABECERAS,
+    )
+    assert respuesta.status_code == 409
+
+    consulta = cliente.get(
+        "/eventos/EVE-O001/fecha",
+        headers=CABECERAS,
+    )
+    assert consulta.status_code == 200
+    assert consulta.json()["fecha"] == (
+        HOY + timedelta(days=14)
+    ).isoformat()
+
+
+def test_no_acepta_fecha_inyectada_en_solicitud(escenario):
+    cliente, propuesta_id = escenario
+
+    respuesta = cliente.post(
+        "/cambios",
+        json={
+            "evento_id": "EVE-O001",
+            "propuesta_id": propuesta_id,
+            "fecha_evento": (HOY + timedelta(days=30)).isoformat(),
+            "motivo": "Intento de cambiar el plazo",
+            "nuevas_lineas": [{
+                "recurso_id": "EVE-P001",
+                "descripcion": "Paquete ampliado",
+                "precio_unitario": "1200",
+                "cantidad": 1,
+            }],
+        },
+        headers=CABECERAS,
+    )
+
+    assert respuesta.status_code == 422
+    assert consultar_evento(cliente)["total_actual"] == "1000.00"

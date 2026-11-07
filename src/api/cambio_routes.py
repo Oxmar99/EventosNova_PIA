@@ -21,6 +21,10 @@ from src.infrastructure.propuesta_repository import (
 )
 from src.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
+from src.infrastructure.fecha_evento_repository import (
+    SqlAlchemyRepositorioDeFechas,
+)
+
 
 router = APIRouter(
     prefix="/cambios",
@@ -30,9 +34,10 @@ router = APIRouter(
 
 
 class CambioEntrada(BaseModel):
+    model_config = {"extra": "forbid"}
+
     evento_id: str = Field(min_length=1, max_length=100)
     propuesta_id: str = Field(min_length=1, max_length=36)
-    fecha_evento: date
     motivo: str = Field(min_length=1, max_length=1000)
     nuevas_lineas: list[LineaEntrada] = Field(min_length=1)
 
@@ -74,6 +79,7 @@ def obtener_servicio(request: Request):
         crear_propuestas=SqlAlchemyRepositorioDePropuestas,
         crear_cambios=SqlAlchemyRepositorioDeCambios,
         fecha_actual=hoy_negocio,
+        crear_fechas=SqlAlchemyRepositorioDeFechas,
     )
 
 
@@ -122,7 +128,6 @@ def solicitar_cambio(
         evento_id=datos.evento_id,
         propuesta_id=datos.propuesta_id,
         nuevas_lineas=lineas,
-        fecha_evento=datos.fecha_evento,
         solicitante=responsable,
         motivo=datos.motivo,
     )
